@@ -46,14 +46,18 @@ class NodeIndexer extends ContentRepositoryAdaptor\Indexer\NodeIndexer
      * @Flow\InjectConfiguration(path="enableLiveAsyncIndexing")
      */
     protected $enableLiveAsyncIndexing;
+    #[\Neos\Flow\Annotations\Inject]
+    protected \Neos\ContentRepositoryRegistry\ContentRepositoryRegistry $contentRepositoryRegistry;
 
     /**
-     * @param NodeInterface $node
+     * @param \Neos\ContentRepository\Core\Projection\ContentGraph\Node $node
      * @param string|null $targetWorkspaceName In case indexing is triggered during publishing, a target workspace name will be passed in
      * @throws ContentRepositoryAdaptor\Exception
      */
-    public function indexNode(NodeInterface $node, $targetWorkspaceName = null): void
+    public function indexNode(\Neos\ContentRepository\Core\Projection\ContentGraph\Node $node, $targetWorkspaceName = null): void
     {
+        // TODO 9.0 migration: !! Node::isRemoved() - the new CR *never* returns removed nodes; so you can simplify your code and just assume removed == FALSE in all scenarios.
+
         if( $node->isRemoved() ){
             $this->removeNode($node, $targetWorkspaceName);
             return;
@@ -69,7 +73,7 @@ class NodeIndexer extends ContentRepositoryAdaptor\Indexer\NodeIndexer
                 return;
             }
 
-            if ($targetWorkspaceName === null && $node->getContext()->getWorkspaceName() !== 'live') {
+            if ($targetWorkspaceName === null && $node->workspaceName !== 'live') {
                 return;
             }
         }
@@ -79,14 +83,14 @@ class NodeIndexer extends ContentRepositoryAdaptor\Indexer\NodeIndexer
     }
 
     /**
-     * @param NodeInterface $node
+     * @param \Neos\ContentRepository\Core\Projection\ContentGraph\Node $node
      * @param string|null $targetWorkspaceName In case indexing is triggered during publishing, a target workspace name will be passed in
      * @throws ContentRepositoryAdaptor\Exception
      * @throws \Flowpack\ElasticSearch\Exception
      * @throws \Neos\Flow\Persistence\Exception\IllegalObjectTypeException
      * @throws \Neos\Utility\Exception\FilesException
      */
-    public function removeNode(NodeInterface $node, string $targetWorkspaceName = null): void
+    public function removeNode(\Neos\ContentRepository\Core\Projection\ContentGraph\Node $node, string $targetWorkspaceName = null): void
     {
         if ($this->enableLiveAsyncIndexing !== true) {
             parent::removeNode($node, $targetWorkspaceName);
@@ -99,12 +103,14 @@ class NodeIndexer extends ContentRepositoryAdaptor\Indexer\NodeIndexer
                 return;
             }
 
-            if ($targetWorkspaceName === null && $node->getContext()->getWorkspaceName() !== 'live') {
+            if ($targetWorkspaceName === null && $node->workspaceName !== 'live') {
                 return;
             }
         }
 
         $dimensionCombinations = $this->dimensionService->getDimensionCombinationsForIndexing($node);
+        // TODO 9.0 migration: !! Node::getWorkspace() does not make sense anymore concept-wise. In Neos < 9, it pointed to the workspace where the node was *at home at*. Now, the closest we have here is the node identity.
+
         $targetWorkspaceName = $targetWorkspaceName ?? $node->getWorkspace()->getName();
 
         if (array_filter($dimensionCombinations) === []) {
@@ -113,17 +119,29 @@ class NodeIndexer extends ContentRepositoryAdaptor\Indexer\NodeIndexer
         } else {
             foreach ($dimensionCombinations as $combination) {
 
-                $nodeFromContext = $this->createContentContext($targetWorkspaceName, $combination)->getNodeByIdentifier($node->getIdentifier());
-                if ($nodeFromContext instanceof NodeInterface && !$nodeFromContext->isRemoved()) {
+                // TODO 9.0 migration: Check if you could change your code to work with the NodeAggregateId value object instead.
+
+                $nodeFromContext = $this->createContentContext($targetWorkspaceName, $combination)->getNodeByIdentifier($node->aggregateId->value);
+                // TODO 9.0 migration: !! Node::isRemoved() - the new CR *never* returns removed nodes; so you can simplify your code and just assume removed == FALSE in all scenarios.
+
+                if ($nodeFromContext instanceof \Neos\ContentRepository\Core\Projection\ContentGraph\Node && !$nodeFromContext->isRemoved()) {
                     continue;
                 }
+                // TODO 9.0 migration: !! Node::getWorkspace() does not make sense anymore concept-wise. In Neos < 9, it pointed to the workspace where the node was *at home at*. Now, the closest we have here is the node identity.
+
+                // TODO 9.0 migration: !! Node::getWorkspace() does not make sense anymore concept-wise. In Neos < 9, it pointed to the workspace where the node was *at home at*. Now, the closest we have here is the node identity.
+                $subgraph = $this->contentRepositoryRegistry->subgraphForNode($node);
+                // TODO 9.0 migration: Try to remove the (string) cast and make your code more type-safe.
+
+                // TODO 9.0 migration: Try to remove the (string) cast and make your code more type-safe.
+
 
                 $fakeNodeArray = [
                     'persistenceObjectIdentifier' => 'fake',
                     'workspace' => $node->getWorkspace()->getName(),
-                    'path' => $node->getPath(),
-                    'identifier' => $node->getIdentifier(),
-                    'nodeType' => $node->getNodeType()->getName(),
+                    'path' => (string) $subgraph->findNodePath($node->aggregateId),
+                    'identifier' => $node->aggregateId->value,
+                    'nodeType' => $node->nodeTypeName->value,
                     'dimensions' => $combination
                 ];
 
@@ -136,19 +154,29 @@ class NodeIndexer extends ContentRepositoryAdaptor\Indexer\NodeIndexer
     /**
      * Returns an array of data from the node for use as job payload.
      *
-     * @param NodeInterface $node
+     * @param \Neos\ContentRepository\Core\Projection\ContentGraph\Node $node
      * @return array
      */
-    protected function nodeAsArray(NodeInterface $node): array
+    protected function nodeAsArray(\Neos\ContentRepository\Core\Projection\ContentGraph\Node $node): array
     {
+        // TODO 9.0 migration: !! Node::getNodeData() - the new CR is not based around the concept of NodeData anymore. You need to rewrite your code here.
+
+        // TODO 9.0 migration: !! Node::getNodeData() - the new CR is not based around the concept of NodeData anymore. You need to rewrite your code here.
+
+        // TODO 9.0 migration: !! Node::getNodeData() - the new CR is not based around the concept of NodeData anymore. You need to rewrite your code here.
+
+        // TODO 9.0 migration: !! Node::getNodeData() - the new CR is not based around the concept of NodeData anymore. You need to rewrite your code here.
+        $subgraph = $this->contentRepositoryRegistry->subgraphForNode($node);
+        // TODO 9.0 migration: Try to remove the (string) cast and make your code more type-safe.
+
         return [
             [
                 'persistenceObjectIdentifier' => $this->persistenceManager->getIdentifierByObject($node->getNodeData()),
-                'identifier' => $node->getIdentifier(),
+                'identifier' => $node->aggregateId->value,
                 'dimensions' => $node->getContext()->getDimensions(),
                 'workspace' => $node->getWorkspace()->getName(),
-                'nodeType' => $node->getNodeType()->getName(),
-                'path' => $node->getPath()
+                'nodeType' => $node->nodeTypeName->value,
+                'path' => (string) $subgraph->findNodePath($node->aggregateId)
             ]
         ];
     }

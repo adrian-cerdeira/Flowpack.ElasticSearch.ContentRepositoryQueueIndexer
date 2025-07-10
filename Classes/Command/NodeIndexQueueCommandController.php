@@ -82,12 +82,6 @@ class NodeIndexQueueCommandController extends CommandController
     protected $nodeDataRepository;
 
     /**
-     * @var WorkspaceRepository
-     * @Flow\Inject
-     */
-    protected $workspaceRepository;
-
-    /**
      * @var NodeIndexer
      * @Flow\Inject
      */
@@ -99,11 +93,8 @@ class NodeIndexQueueCommandController extends CommandController
      */
     protected $batchSize;
 
-    /**
-     * @Flow\Inject
-     * @var \Neos\ContentRepository\Domain\Service\ContentDimensionCombinator
-     */
-    protected $contentDimensionCombinator;
+    #[\Neos\Flow\Annotations\Inject]
+    protected \Neos\ContentRepositoryRegistry\ContentRepositoryRegistry $contentRepositoryRegistry;
 
     /**
      * Index all nodes by creating a new index and when everything was completed, switch the index alias.
@@ -139,8 +130,12 @@ class NodeIndexQueueCommandController extends CommandController
             $this->outputLine();
             $this->indexWorkspace($workspace, $indexPostfix);
         }
+        $contentRepository = $this->contentRepositoryRegistry->get(\Neos\ContentRepository\Core\SharedModel\ContentRepository\ContentRepositoryId::fromString('default'));
+        $dimensionSpacePoints = $contentRepository->getVariationGraph()->getDimensionSpacePoints();
+        // TODO 9.0 migration: try to directly work with $dimensionSpacePoints, instead of converting them to the legacy dimension format
 
-        $combinations = new ArrayCollection($this->contentDimensionCombinator->getAllAllowedCombinations());
+
+        $combinations = new ArrayCollection(array_map(fn(\Neos\ContentRepository\Core\DimensionSpace\DimensionSpacePoint $dimensionSpacePoint) => $dimensionSpacePoint->toLegacyDimensionArray(), iterator_to_array($dimensionSpacePoints)));
         $combinations->map(function (array $dimensionValues) use ($indexPostfix) {
             $updateAliasJob = new UpdateAliasJob($indexPostfix, $dimensionValues);
             $this->jobManager->queue(self::BATCH_QUEUE_NAME, $updateAliasJob);
@@ -319,7 +314,11 @@ class NodeIndexQueueCommandController extends CommandController
      */
     protected function updateMapping(string $indexPostfix): void
     {
-        $combinations = new ArrayCollection($this->contentDimensionCombinator->getAllAllowedCombinations());
+        $contentRepository = $this->contentRepositoryRegistry->get(\Neos\ContentRepository\Core\SharedModel\ContentRepository\ContentRepositoryId::fromString('default'));
+        $dimensionSpacePoints = $contentRepository->getVariationGraph()->getDimensionSpacePoints();
+        // TODO 9.0 migration: try to directly work with $dimensionSpacePoints, instead of converting them to the legacy dimension format
+
+        $combinations = new ArrayCollection(array_map(fn(\Neos\ContentRepository\Core\DimensionSpace\DimensionSpacePoint $dimensionSpacePoint) => $dimensionSpacePoint->toLegacyDimensionArray(), iterator_to_array($dimensionSpacePoints)));
         $combinations->map(function (array $dimensionValues) use ($indexPostfix) {
             $this->nodeIndexer->setDimensions($dimensionValues);
             $this->nodeIndexer->setIndexNamePostfix($indexPostfix);

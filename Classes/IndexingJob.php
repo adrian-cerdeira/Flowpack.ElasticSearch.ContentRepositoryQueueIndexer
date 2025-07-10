@@ -47,8 +47,10 @@ class IndexingJob extends AbstractIndexingJob
                     $this->logger->notice(sprintf('Node data of node %s could not be loaded. Node might be deleted."', $node['identifier']), LogEnvironment::fromMethodName(__METHOD__));
                     continue;
                 }
+                // TODO 9.0 migration: !! NodeData::getWorkspace is removed in Neos 9.0 - the new CR is not based around the concept of NodeData anymore. You need to rewrite your code here.
 
-                $context = $this->contextFactory->create([
+
+                $context = new \Neos\Rector\ContentRepository90\Legacy\LegacyContextStub([
                     'workspaceName' => $this->targetWorkspaceName ?: $nodeData->getWorkspace()->getName(),
                     'invisibleContentShown' => true,
                     'inaccessibleContentShown' => false,
@@ -57,7 +59,7 @@ class IndexingJob extends AbstractIndexingJob
                 $currentNode = $this->nodeFactory->createFromNodeData($nodeData, $context);
 
                 // Skip this iteration if the node can not be fetched from the current context
-                if (!$currentNode instanceof NodeInterface) {
+                if (!$currentNode instanceof \Neos\ContentRepository\Core\Projection\ContentGraph\Node) {
                     $this->logger->warning(sprintf('Node %s could not be created from node data"', $node['identifier']), LogEnvironment::fromMethodName(__METHOD__));
                     continue;
                 }

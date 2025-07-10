@@ -43,18 +43,6 @@ abstract class AbstractIndexingJob implements JobInterface
     protected $nodeDataRepository;
 
     /**
-     * @var NodeFactory
-     * @Flow\Inject
-     */
-    protected $nodeFactory;
-
-    /**
-     * @var ContextFactoryInterface
-     * @Flow\Inject
-     */
-    protected $contextFactory;
-
-    /**
      * @var FakeNodeDataFactory
      * @Flow\Inject
      */

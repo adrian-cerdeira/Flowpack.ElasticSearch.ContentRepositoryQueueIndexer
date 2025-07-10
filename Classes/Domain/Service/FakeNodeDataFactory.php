@@ -27,22 +27,12 @@ use Neos\Flow\Persistence\Doctrine\PersistenceManager;
 class FakeNodeDataFactory
 {
     /**
-     * @var WorkspaceRepository
-     * @Flow\Inject
-     */
-    protected $workspaceRepository;
-
-    /**
-     * @var NodeTypeManager
-     * @Flow\Inject
-     */
-    protected $nodeTypeManager;
-
-    /**
      * @var PersistenceManager
      * @Flow\Inject
      */
     protected $persistenceManager;
+    #[\Neos\Flow\Annotations\Inject]
+    protected \Neos\ContentRepositoryRegistry\ContentRepositoryRegistry $contentRepositoryRegistry;
 
     /**
      * This creates a "fake" removed NodeData instance from the given payload
@@ -73,13 +63,17 @@ class FakeNodeDataFactory
 
         $nodeData = new NodeData($payload['path'], $workspace, $payload['identifier'], isset($payload['dimensions']) ? $payload['dimensions'] : null);
         try {
-            $nodeData->setNodeType($this->nodeTypeManager->getNodeType($payload['nodeType']));
+            // TODO 9.0 migration: Make this code aware of multiple Content Repositories.
+            $contentRepository = $this->contentRepositoryRegistry->get(\Neos\ContentRepository\Core\SharedModel\ContentRepository\ContentRepositoryId::fromString('default'));
+            $nodeData->setNodeType($contentRepository->getNodeTypeManager()->getNodeType($payload['nodeType']));
         } catch (NodeTypeNotFoundException $e) {
             throw new Exception('Unable to create fake node data, node type not found', 1509362172);
         }
 
         $nodeData->setProperty('title', 'Fake node');
         $nodeData->setProperty('uriPathSegment', 'fake-node');
+        // TODO 9.0 migration: !! NodeData::setRemoved is removed in Neos 9.0 - the new CR is not based around the concept of NodeData anymore. You need to rewrite your code here.
+
 
         $nodeData->setRemoved(true);
 
